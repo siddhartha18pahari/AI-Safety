@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: decidion
+      POSTGRES_PASSWORD: decidion
+      POSTGRES_DB: decidion
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decidion -d decidion"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://decidion:decidion@db:5432/decidion
+      DECIDION_API_KEY: ddn_demo_local
+      DECIDION_LIVE_DEMO: "1"
+      DECIDION_SEED: "1"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

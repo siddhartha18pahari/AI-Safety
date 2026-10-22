@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: "Newsreader", Georgia, serif;
+  --color-bg: #07090c;
+  --color-panel: #10161d;
+  --color-panel-2: #161e28;
+  --color-ink: #e8eef3;
+  --color-muted: #93a4b5;
+  --color-faint: #6d7f90;
+  --color-line: rgba(186, 214, 230, 0.14);
+  --color-cyan: #3ee0c5;
+  --color-cyan-2: #b8fff2;
+  --color-amber: #e6b15a;
+  --color-rose: #f08378;
+  --color-allow: #7ddeaf;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(140, 176, 196, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 176, 196, 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 15%, transparent 68%);
+}
+
+:focus-visible {
+  outline: 2px solid #8ef6e4;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(62, 224, 197, 0.28);
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-cyan-2);
+}
+
+.rise {
+  animation: rise 0.55s ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .rise {
+    animation: none;
+  }
+}
