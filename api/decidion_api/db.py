@@ -8,8 +8,23 @@ class Base(DeclarativeBase):
     pass
 
 
+def normalize_database_url(url: str) -> str:
+    """Use the psycopg 3 driver for libpq-style Postgres URLs.
+
+    Render's ``connectionString`` is ``postgresql://`` (some hosts still emit
+    ``postgres://``). SQLAlchemy treats a bare ``postgresql://`` URL as psycopg2,
+    which this service does not install. ``postgresql+psycopg://`` is left as-is.
+    """
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
 def database_url() -> str:
-    return os.environ.get("DATABASE_URL", "sqlite:///./decidion.db")
+    raw = os.environ.get("DATABASE_URL", "sqlite:///./decidion.db")
+    return normalize_database_url(raw)
 
 
 def make_engine(url: str | None = None):

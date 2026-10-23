@@ -1,0 +1,38 @@
+# Render Blueprint for the Decidion API and its Postgres database.
+# Apply from the Render Dashboard (Blueprints) against this repo.
+# The marketing site stays on Vercel; this file does not deploy web/.
+
+databases:
+  - name: decidion-db
+    plan: free
+    databaseName: decidion
+    user: decidion
+    postgresMajorVersion: "16"
+    region: oregon
+
+services:
+  - type: web
+    name: decidion-api
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install ./sdk "./api"
+    startCommand: uvicorn decidion_api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.11"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: decidion-db
+          property: connectionString
+      - key: DECIDION_API_KEY
+        value: ddn_demo_local
+      - key: DECIDION_SEED
+        value: "1"
+      - key: DECIDION_LIVE_DEMO
+        value: "0"
+      - key: CORS_ORIGINS
+        value: https://decidion.vercel.app
+      - key: CORS_ORIGIN_REGEX
+        value: 'https://.*\.vercel\.app'

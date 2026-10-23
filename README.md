@@ -47,6 +47,40 @@ docker compose up --build
 
 `DECIDION_LIVE_DEMO=1` in Compose submits a safe tool call every few seconds so the overview keeps moving. Leave it unset (or `0`) when you want a quiet database.
 
+## Deploy
+
+The site is a Vite app. Vercel should use root directory `web`. The API is a Render web service defined in `render.yaml`, with a managed Postgres database. `web/vercel.json` rewrites every path to `index.html`, so routes such as `/console` and `/industries` load the SPA instead of a host 404.
+
+### Vercel environment variables
+
+Vite inlines these at **build** time. Set them on the Vercel project, then redeploy.
+
+| Variable | Required | Value |
+| --- | --- | --- |
+| `VITE_API_URL` | Yes, for the live console | Public origin of the Render API. No trailing slash and no `/api` suffix. Example: `https://decidion-api.onrender.com` |
+| `VITE_DECIDION_API_KEY` | Only if the API key is not the demo default | Must match `DECIDION_API_KEY`. Unset builds send `ddn_demo_local`. |
+
+When `VITE_API_URL` is unset, the console calls same-origin `/api`. `npm run dev` proxies that to `http://127.0.0.1:8000`, and the Docker nginx image does the same. That is the local fallback. Set `VITE_API_URL=http://127.0.0.1:8000` only when the browser should call the API directly.
+
+### Render environment variables
+
+Apply `render.yaml` from the Render Dashboard. The Blueprint creates the service `decidion-api` and the database `decidion-db`, installs `./sdk` and `./api`, and starts `uvicorn decidion_api.main:app --host 0.0.0.0 --port $PORT`. The health check path is `/health`.
+
+| Variable | Who sets it | Value |
+| --- | --- | --- |
+| `DATABASE_URL` | Blueprint, from the database `connectionString` | Render's private URL (`postgresql://` or `postgres://`). The API rewrites it to `postgresql+psycopg://` before SQLAlchemy connects. Do not paste a URL into the repo. |
+| `DECIDION_API_KEY` | Blueprint | `ddn_demo_local`. This is the public demo key, not a production secret. |
+| `DECIDION_SEED` | Blueprint | `1`. On startup the API creates tables and, when the database has no agents, loads the demo agents, decisions, escalation, and evaluation. A restart does not insert them again. `0` skips seeding. |
+| `CORS_ORIGINS` | Blueprint | `https://decidion.vercel.app`. Comma-separate extra exact origins if you add a custom domain. |
+| `CORS_ORIGIN_REGEX` | Blueprint | `https://.*\.vercel\.app`, so `*.vercel.app` preview deployments can call the API. Empty disables the pattern. |
+| `DECIDION_LIVE_DEMO` | Blueprint | `0`. |
+| `PYTHON_VERSION` | Blueprint | `3.12.11`. |
+| `PORT` | Render | The start command reads `$PORT`. Do not set this yourself. |
+
+If `CORS_ORIGINS` and `CORS_ORIGIN_REGEX` are unset (local uvicorn), the API allows the localhost dev origins, `https://decidion.vercel.app`, and the same preview regex.
+
+Free Render instances sleep when idle. The first request after sleep waits for the process, and the database, to come back. The demo key is shared with every browser that loads the console.
+
 ## End-to-end flow
 
 ```bash
