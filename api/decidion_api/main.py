@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from decidion_api.compliance import build_report
-from decidion_api.db import SessionLocal, get_db, init_db
+from decidion_api.db import SessionLocal, database_url, get_db, init_db
 from decidion_api.engine.audit import verify_chain
 from decidion_api.engine.evaluators import evaluator_catalog
 from decidion_api.errors import AgentNotFound, PolicyError
@@ -43,6 +43,33 @@ from decidion_api.service import (
 from sqlalchemy import select
 
 log = logging.getLogger("decidion")
+
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "https://decidion.vercel.app",
+]
+_DEFAULT_CORS_ORIGIN_REGEX = r"https://.*\.vercel\.app"
+
+
+def cors_settings() -> tuple[list[str], str | None]:
+    """Exact origins plus an optional regex for Vercel preview hosts.
+
+    ``CORS_ORIGINS`` is a comma-separated list. ``CORS_ORIGIN_REGEX`` is a
+    Python regex matched against the full Origin header. An empty regex
+    disables the pattern match.
+    """
+    raw_origins = os.environ.get("CORS_ORIGINS")
+    if raw_origins is None:
+        origins = list(_DEFAULT_CORS_ORIGINS)
+    else:
+        origins = [item.strip() for item in raw_origins.split(",") if item.strip()]
+    raw_regex = os.environ.get("CORS_ORIGIN_REGEX", _DEFAULT_CORS_ORIGIN_REGEX).strip()
+    return origins, raw_regex or None
 
 
 def require_key(
@@ -82,10 +109,12 @@ async def _live_demo() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("opening database with driver %s", database_url().split("://", 1)[0])
     init_db()
     if os.getenv("DECIDION_SEED", "1") != "0":
         with SessionLocal() as db:
-            seed_if_empty(db)
+            seeded = seed_if_empty(db)
+        log.info("demo seed %s", "applied" if seeded else "skipped (agents already present)")
     task = None
     if os.getenv("DECIDION_LIVE_DEMO", "0") == "1":
         task = asyncio.create_task(_live_demo())
@@ -105,9 +134,11 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+_cors_origins, _cors_origin_regex = cors_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

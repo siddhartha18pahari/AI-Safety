@@ -1,9 +1,19 @@
 export const API_KEY = import.meta.env.VITE_DECIDION_API_KEY || "ddn_demo_local";
 
+/**
+ * Absolute API origin from `VITE_API_URL` (no trailing slash), or `/api` when
+ * that variable is unset. Local `npm run dev` and the Docker nginx image proxy
+ * `/api` to the API on 127.0.0.1:8000. A Vercel build must set `VITE_API_URL`
+ * to the Render origin, because Vite inlines it and Vercel does not proxy `/api`.
+ * Paths stay `/v1/...`; do not include an `/api` suffix on `VITE_API_URL`.
+ */
+const configuredApiUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
+export const API_BASE = configuredApiUrl || "/api";
+
 export class ApiError extends Error {}
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",

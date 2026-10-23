@@ -187,11 +187,16 @@ def install_defaults(db: Session) -> None:
     db.commit()
 
 
-def seed_if_empty(db: Session) -> None:
+def seed_if_empty(db: Session) -> bool:
+    """Install default policies and, when no agents exist, the demo history.
+
+    Returns True only on the first seed so a restart against Postgres does not
+    duplicate agents or decisions.
+    """
     install_defaults(db)
     count = db.scalar(select(func.count()).select_from(Agent)) or 0
     if count:
-        return
+        return False
     for spec in AGENTS:
         register_agent(db, **spec)
     start = datetime.now(timezone.utc) - timedelta(hours=6)
@@ -215,3 +220,4 @@ def seed_if_empty(db: Session) -> None:
         resolver="finance_manager",
     )
     run_evaluation(db, "agt_credit")
+    return True
