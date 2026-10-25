@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Decision } from "../api";
 import {
@@ -18,6 +18,7 @@ import {
   stats,
   webhookSnippet,
 } from "../data";
+import { CountUp, FrameworkMark, Marquee, useReducedMotion } from "../motion";
 import { Button, Check, Outcome, Panel, useTitle } from "../ui";
 
 export function HomePage() {
@@ -25,6 +26,7 @@ export function HomePage() {
   return (
     <main>
       <Hero />
+      <FrameworkMarquee />
       <Integrations />
       <Testimonials />
       <Problems />
@@ -39,6 +41,21 @@ export function HomePage() {
   );
 }
 
+function FrameworkMarquee() {
+  const reduced = useReducedMotion();
+  const names = frameworks.map((item) => item.name);
+  const loop = reduced ? names : [...names, ...names];
+  return (
+    <section className="border-b border-line" aria-hidden="true">
+      <Marquee>
+        {loop.map((name, index) => (
+          <FrameworkMark key={`${name}-${index}`} name={name} />
+        ))}
+      </Marquee>
+    </section>
+  );
+}
+
 function Hero() {
   const [index, setIndex] = useState(0);
   useEffect(() => {
@@ -48,19 +65,25 @@ function Hero() {
   }, []);
   const [lineA, lineB] = rotations[index];
   return (
-    <section className="border-b border-line">
+    <section className="hero-stage border-b border-line">
+      <div className="aurora" aria-hidden="true">
+        <span className="blob blob-a" />
+        <span className="blob blob-b" />
+        <span className="blob blob-c" />
+        <span className="grid-fade" />
+      </div>
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-[1.15fr_0.85fr] lg:py-24">
         <div>
           <p className="kicker">The unified plane for multi-agent systems</p>
-          <div className="mt-5 min-h-[9.5rem]" aria-live="polite">
-            <p key={lineA} className="rise text-3xl font-semibold tracking-tight text-cyan-2 sm:text-5xl">
+          <div className="mt-5 min-h-[7.5rem] sm:min-h-[8.5rem]" aria-live="polite">
+            <p key={lineA} className="rise headline-glow text-2xl font-semibold tracking-tight text-cyan-2 sm:text-4xl">
               {lineA}
             </p>
-            <p key={lineB} className="rise mt-1 text-3xl font-semibold tracking-tight sm:text-5xl">
+            <p key={lineB} className="rise headline-glow mt-1 text-2xl font-semibold tracking-tight sm:text-4xl">
               {lineB}
             </p>
           </div>
-          <h1 className="mt-2 font-mono text-sm tracking-[0.28em] text-muted">ONE UNIFIED PLANE</h1>
+          <h1 className="plane mt-3">ONE UNIFIED PLANE</h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted">
             The single platform for Governance, Risk Management, Compliance, Data Governance, Security, and Evaluations of Multi-Agent Systems. From development through production.
           </p>
@@ -74,9 +97,9 @@ function Hero() {
         <LiveTape />
       </div>
       <div className="mx-auto max-w-6xl px-5 pb-16">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {pillars.map((item) => (
-            <Panel key={item.title} className="p-5">
+            <Panel key={item.title} className="tilt p-5">
               <h2 className="text-base font-semibold">{item.title}</h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">{item.line}</p>
             </Panel>
@@ -171,27 +194,63 @@ const fallbackDecisions: Decision[] = [
   },
 ];
 
+function tapeRows(items: Decision[], stamp: string) {
+  const rows: Decision[] = [];
+  while (rows.length < 4) rows.push(items[rows.length % items.length]);
+  return rows.map((row, index) => ({ ...row, id: `${row.id}-${stamp}-${index}` }));
+}
+
 function LiveTape() {
-  const [rows, setRows] = useState<Decision[]>(fallbackDecisions);
+  const reduced = useReducedMotion();
+  const [source, setSource] = useState<Decision[]>(fallbackDecisions);
+  const [rows, setRows] = useState<Decision[]>(() => tapeRows(fallbackDecisions, "init"));
+  const cursor = useRef(0);
+
   useEffect(() => {
-    api<Decision[]>("/v1/decisions?limit=3")
+    api<Decision[]>("/v1/decisions?limit=8")
       .then((items) => {
-        if (items.length) setRows(items);
+        if (!items.length) return;
+        setSource(items);
+        setRows(tapeRows(items, "api"));
+        cursor.current = 0;
       })
-      .catch(() => setRows(fallbackDecisions));
+      .catch(() => {
+        setSource(fallbackDecisions);
+        setRows(tapeRows(fallbackDecisions, "demo"));
+      });
   }, []);
+
+  useEffect(() => {
+    if (reduced) {
+      setRows(tapeRows(source, "still"));
+      return;
+    }
+    const timer = window.setInterval(() => {
+      cursor.current = (cursor.current + 1) % source.length;
+      const next = source[cursor.current];
+      const stamped = { ...next, id: `${next.id}-${cursor.current}-${Date.now()}` };
+      setRows((current) => [stamped, ...current].slice(0, 4));
+    }, 2200);
+    return () => window.clearInterval(timer);
+  }, [reduced, source]);
+
   return (
     <Panel className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <p className="kicker">Control plane</p>
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <p className="kicker flex items-center gap-2">
+          <span className="live-dot" aria-hidden="true" />
+          Control plane
+        </p>
         <span className="font-mono text-[11px] text-faint">ALLOW · ESCALATE · BLOCK</span>
       </div>
-      <ul>
+      <ul className="h-[17.5rem] overflow-hidden">
         {rows.map((row) => (
-          <li key={row.id} className="border-b border-line px-4 py-3 last:border-b-0">
+          <li key={row.id} className="stream-row border-b border-line px-4 py-3 last:border-b-0">
             <div className="flex items-center justify-between gap-3">
               <p className="truncate text-sm">{row.agent_name || row.agent_id}</p>
-              <Outcome value={row.outcome} />
+              <span className="outcome-live">
+                <Outcome value={row.outcome} />
+              </span>
             </div>
             <p className="mt-1 font-mono text-xs text-faint">
               {row.tool}
@@ -230,12 +289,13 @@ function Integrations() {
           LangChain, CrewAI, AutoGen, LangGraph, and custom runtimes call the same decide API. The SDK raises before the tool runs. REST and the webhook alias return the same outcome.
         </p>
         <div className="mt-8 grid gap-6 lg:grid-cols-[240px_1fr]">
-          <div className="flex gap-2 overflow-x-auto lg:flex-col">
+          <div className="stagger flex gap-2 overflow-x-auto lg:flex-col">
             {frameworks.map((item) => (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => setFramework(item)}
-                className={`rounded-xl border px-3 py-3 text-left text-sm ${framework.id === item.id ? "border-cyan/50 bg-cyan/10 text-ink" : "border-line text-muted"}`}
+                className={`tilt rounded-xl border px-3 py-3 text-left text-sm ${framework.id === item.id ? "border-cyan/50 bg-cyan/10 text-ink" : "border-line text-muted"}`}
               >
                 <span className="block font-medium text-ink">{item.name}</span>
                 <span className="mt-1 block text-xs leading-relaxed">{item.blurb}</span>
@@ -247,6 +307,7 @@ function Integrations() {
               {(["SDK", "REST API", "Webhook"] as const).map((item) => (
                 <button
                   key={item}
+                  type="button"
                   onClick={() => setTab(item)}
                   className={`rounded-full px-3 py-1 text-xs ${tab === item ? "bg-white text-[#071018]" : "text-muted"}`}
                 >
@@ -257,10 +318,12 @@ function Integrations() {
             <Code code={code} />
           </Panel>
         </div>
-        <dl className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5">
+        <dl className="stagger mt-10 grid grid-cols-2 gap-4 md:grid-cols-5">
           {stats.map((item) => (
             <div key={item.label}>
-              <dt className="text-2xl font-semibold text-cyan-2 md:text-3xl">{item.value}</dt>
+              <dt className="text-2xl font-semibold text-cyan-2 md:text-3xl">
+                <CountUp value={item.value} />
+              </dt>
               <dd className="mt-1 text-xs uppercase tracking-wider text-muted">{item.label}</dd>
             </div>
           ))}
@@ -276,9 +339,9 @@ function Testimonials() {
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Trusted by industry leaders</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">One platform to deploy AI faster, safely.</h2>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {quotes.map((item) => (
-            <figure key={item.name} className="rounded-2xl border border-line bg-panel/70 p-6">
+            <figure key={item.name} className="glass tilt rounded-2xl p-6">
               <blockquote className="font-serif text-2xl leading-snug text-ink">“{item.quote}”</blockquote>
               <figcaption className="mt-6">
                 <p className="font-medium">{item.name}</p>
@@ -299,9 +362,9 @@ function Problems() {
         <p className="kicker">Making AI enterprise-ready</p>
         <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">AI tools your teams love leak data and create risk.</h2>
         <p className="mt-4 text-muted">Most AI deployments are vulnerable. They don't have to be.</p>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {problems.map((item, index) => (
-            <Panel key={item.title} className="p-5">
+            <Panel key={item.title} className="tilt p-5">
               <p className="font-mono text-xs text-faint">0{index + 1}</p>
               <h3 className="mt-2 text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{item.line}</p>
@@ -320,9 +383,9 @@ function Solution() {
         <p className="kicker">Solution</p>
         <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Decidion is the command and control plane for AI agents</h2>
         <p className="mt-4 max-w-2xl text-muted">Discover how Decidion connects any agent, any framework, anywhere securely.</p>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="stagger mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {capabilities.map((item) => (
-            <div key={item.title} className="rounded-2xl border border-line p-5">
+            <div key={item.title} className="glass tilt rounded-2xl p-5">
               <h3 className="font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm text-muted">{item.line}</p>
             </div>
@@ -340,9 +403,9 @@ function FeatureGrid() {
         <p className="kicker">The problem we solve</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">The unified plane for multi-agent systems</h2>
         <p className="mt-4 text-muted">One platform unifying Governance, Risk, Compliance, Data Governance, Security & Evaluations</p>
-        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="stagger mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map((item) => (
-            <Panel key={item.title} className="p-5">
+            <Panel key={item.title} className="tilt p-5">
               <h3 className="text-lg font-semibold">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted">{item.line}</p>
               <ul className="mt-4 space-y-2">
@@ -365,9 +428,9 @@ function LifecycleGrid() {
         <p className="kicker">Unified governance plane</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Complete lifecycle coverage: development to production</h2>
         <p className="mt-4 max-w-3xl text-muted">One unified plane for monitoring, observability, and management of governance and security—covering 30+ capabilities</p>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
+        <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {coverage.map((group) => (
-            <Panel key={group.title} className="p-5">
+            <Panel key={group.title} className="tilt p-5">
               <h3 className="text-lg font-semibold">{group.title}</h3>
               <p className="mt-1 text-sm text-muted">{group.line}</p>
               <ul className="mt-4 divide-y divide-line">
@@ -401,24 +464,95 @@ function LifecycleGrid() {
 }
 
 function Architecture() {
+  const reduced = useReducedMotion();
+  const [active, setActive] = useState(0);
+  const [lit, setLit] = useState(0);
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current) window.clearInterval(timer.current);
+    };
+  }, []);
+
+  function trace() {
+    if (timer.current) window.clearInterval(timer.current);
+    if (reduced) {
+      setActive(layers.length - 1);
+      setLit(3);
+      return;
+    }
+    let step = 0;
+    setActive(0);
+    setLit(1);
+    timer.current = window.setInterval(() => {
+      step += 1;
+      if (step >= layers.length) {
+        if (timer.current) window.clearInterval(timer.current);
+        setLit(3);
+        return;
+      }
+      setActive(step);
+      setLit(step + 1);
+    }, 700);
+  }
+
   return (
     <section id="architecture" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
-        <p className="kicker">Architecture</p>
-        <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Four-layer architecture</h2>
-        <p className="mt-4 max-w-2xl text-muted">From autonomous enforcement to human oversight—governance that scales with your AI operations</p>
-        <div className="mt-8 grid gap-3">
-          {layers.map((item) => (
-            <div key={item.layer} className="grid gap-2 rounded-2xl border border-line bg-panel/60 p-5 md:grid-cols-[140px_1fr]">
-              <p className="font-mono text-xs text-cyan-2">{item.layer}</p>
-              <div>
-                <h3 className="font-semibold">{item.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{item.line}</p>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="kicker">Architecture</p>
+            <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Four-layer architecture</h2>
+            <p className="mt-4 max-w-2xl text-muted">From autonomous enforcement to human oversight—governance that scales with your AI operations</p>
+          </div>
+          <button type="button" onClick={trace} className="rounded-full border border-cyan/40 px-4 py-2 text-sm text-cyan-2 hover:bg-cyan/10">
+            Trace a decision
+          </button>
         </div>
-        <p className="mt-6 font-mono text-sm tracking-wide text-ink">Three decision outcomes: ALLOW · ESCALATE · BLOCK</p>
+        <div className="arch mt-8">
+          <div className="arch-rail" aria-hidden="true">
+            {layers.map((item, index) => (
+              <span key={item.layer} className={index <= active ? "on" : undefined} />
+            ))}
+          </div>
+          <div className="grid gap-3">
+            {layers.map((item, index) => (
+              <div
+                key={item.layer}
+                role="button"
+                tabIndex={0}
+                aria-pressed={active === index}
+                onClick={() => {
+                  setActive(index);
+                  setLit(index + 1);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  setActive(index);
+                  setLit(index + 1);
+                }}
+                className={`layer-btn glass grid cursor-pointer gap-2 rounded-2xl p-5 md:grid-cols-[140px_1fr] ${active === index ? "is-active" : ""}`}
+              >
+                <p className="font-mono text-xs text-cyan-2">{item.layer}</p>
+                <div>
+                  <h3 className="font-semibold">{item.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-muted">{item.line}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-6 font-mono text-sm tracking-wide text-ink">
+          Three decision outcomes:{" "}
+          {["ALLOW", "ESCALATE", "BLOCK"].map((outcome, index) => (
+            <span key={outcome}>
+              {index > 0 ? " · " : null}
+              <span className={lit > index ? "text-cyan-2" : undefined}>{outcome}</span>
+            </span>
+          ))}
+        </p>
       </div>
     </section>
   );
@@ -428,7 +562,7 @@ function QuoteBand() {
   return (
     <section className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-16">
-        <blockquote className="max-w-3xl font-serif text-2xl leading-snug md:text-3xl">
+        <blockquote className="glass max-w-3xl rounded-3xl p-6 font-serif text-2xl leading-snug md:p-8 md:text-3xl">
           “Decidion gave us the confidence to deploy 200+ AI agents across our lending operations. We went from manual spot-checks to real-time governance of every decision—and our last regulatory exam had zero AI-related findings.”
         </blockquote>
         <p className="mt-6 font-medium">Chief Risk Officer</p>
@@ -452,8 +586,10 @@ export function Industries() {
               <p className="mt-1 text-muted">{block.tagline}</p>
               <dl className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {block.metrics.map(([value, label]) => (
-                  <div key={label} className="rounded-2xl border border-line p-4">
-                    <dt className="text-2xl font-semibold text-cyan-2">{value}</dt>
+                  <div key={label} className="glass rounded-2xl p-4">
+                    <dt className="text-2xl font-semibold text-cyan-2">
+                      <CountUp value={value} />
+                    </dt>
                     <dd className="mt-1 text-xs uppercase tracking-wider text-muted">{label}</dd>
                   </div>
                 ))}
@@ -489,6 +625,7 @@ function GetStarted() {
   return (
     <section className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
+        <div className="cta-band">
         <p className="kicker">Get started</p>
         <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">Ready to govern your AI fleet with confidence?</h2>
         <p className="mt-4 max-w-2xl text-muted">
@@ -506,6 +643,7 @@ function GetStarted() {
             Open the platform console
           </Link>
         </p>
+        </div>
       </div>
     </section>
   );

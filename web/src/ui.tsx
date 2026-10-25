@@ -69,7 +69,7 @@ export function Outcome({ value }: { value: string }) {
 }
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-line bg-panel/80 ${className}`}>{children}</div>;
+  return <div className={`glass rounded-2xl ${className}`}>{children}</div>;
 }
 
 export function PageHero({
@@ -84,7 +84,7 @@ export function PageHero({
   children?: ReactNode;
 }) {
   return (
-    <header className="border-b border-line">
+    <header className="page-hero border-b border-line">
       <div className="mx-auto max-w-6xl px-5 pb-14 pt-16">
         <p className="kicker">{kicker}</p>
         <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">{title}</h1>
