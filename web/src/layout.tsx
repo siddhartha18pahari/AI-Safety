@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link, useLocation } from "react-router-dom";
 import { nav } from "./data";
+import { useMarketingMotion } from "./motion";
 import { Button, Wordmark } from "./ui";
 
 export function MarketingLayout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  useMarketingMotion(location.pathname);
 
   useEffect(() => {
     setOpen(false);
@@ -19,7 +21,7 @@ export function MarketingLayout() {
 
   return (
     <div className="relative min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-[#07090c]/85 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-line bg-[#07090c]/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3">
           <Wordmark />
           <nav className="ml-auto hidden items-center gap-4 xl:flex">
