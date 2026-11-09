@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
+  API_BASE,
   api,
   type Agent,
   type AuditEvent,
@@ -13,7 +14,8 @@ import {
   type Policy,
   type Report,
 } from "../api";
-import { Mark, Outcome, useTitle } from "../ui";
+import { probeApiHealth } from "../health";
+import { Mark, Outcome, Status, useTitle } from "../ui";
 
 const links = [
   ["/console", "Overview"],
@@ -30,9 +32,44 @@ const links = [
 export function ConsoleLayout() {
   useTitle("Console");
   const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setHealth("checking");
+    probeApiHealth(`${API_BASE}/health`, fetch, controller.signal).then((up) => {
+      if (active) setHealth(up ? "up" : "down");
+    });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const current = links.find(([href]) => (href === "/console" ? location.pathname === "/console" : location.pathname.startsWith(href)));
+
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
-      <aside className="border-b border-line bg-[#0b1016] lg:border-b-0 lg:border-r">
+    <div className="min-h-screen lg:grid lg:grid-cols-[232px_1fr]">
+      <a className="skip" href="#console-main">
+        Skip to content
+      </a>
+      {open ? <button type="button" className="console-scrim lg:hidden" aria-label="Close menu" onClick={() => setOpen(false)} /> : null}
+      <aside className={`console-side ${open ? "is-open" : ""}`}>
         <div className="flex items-center gap-2 px-4 py-4">
           <Mark size={24} />
           <div>
@@ -42,14 +79,14 @@ export function ConsoleLayout() {
             <p className="font-mono text-[10px] text-faint">CONTROL PLANE</p>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:block lg:space-y-1 lg:px-3">
+        <nav id="console-nav" className="px-3 pb-4" aria-label="Console">
           {links.map(([href, label]) => (
             <NavLink
               key={href}
               to={href}
               end={href === "/console"}
               className={({ isActive }) =>
-                `block whitespace-nowrap rounded-lg px-3 py-2 text-sm ${isActive ? "bg-cyan/15 text-cyan-2" : "text-muted hover:text-ink"}`
+                `rounded-lg px-3 text-sm ${isActive ? "bg-cyan/15 text-cyan-2" : "text-muted hover:text-ink"}`
               }
             >
               {label}
@@ -57,12 +94,27 @@ export function ConsoleLayout() {
           ))}
         </nav>
       </aside>
-      <div>
-        <div className="flex items-center justify-between border-b border-line px-5 py-3">
-          <p className="font-mono text-xs text-faint">{location.pathname}</p>
-          <p className="font-mono text-[11px] text-muted">Demo key · local database</p>
-        </div>
-        <div className="px-5 py-6">
+      <div className="min-w-0">
+        <header className="console-top">
+          <button
+            type="button"
+            className="rounded-full border border-line px-3 py-2 text-xs uppercase tracking-wider text-muted lg:hidden"
+            aria-expanded={open}
+            aria-controls="console-nav"
+            onClick={() => setOpen((value) => !value)}
+          >
+            Sections
+          </button>
+          <p className="font-medium">{current?.[1] || "Console"}</p>
+          <p className="source-note ml-auto max-w-md text-right">
+            {health === "up"
+              ? "API responded. Figures here are this database, not the marketing totals."
+              : health === "down"
+                ? "API did not respond. These pages are not showing connected data."
+                : "Checking the API…"}
+          </p>
+        </header>
+        <div id="console-main" className="px-4 py-6 sm:px-6">
           <Outlet />
         </div>
       </div>
@@ -104,12 +156,22 @@ function Offline({ error }: { error: string }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function Stat({ label, value, note }: { label: string; value: string | number; note?: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-panel/70 p-4">
+    <div className="glass rounded-2xl p-4">
       <p className="font-mono text-[11px] uppercase tracking-wider text-faint">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+      {note ? <p className="source-note mt-1">{note}</p> : null}
     </div>
+  );
+}
+
+function PageIntro({ title, children }: { title: string; children: string }) {
+  return (
+    <header className="max-w-2xl">
+      <h1 className="display text-2xl sm:text-3xl">{title}</h1>
+      <p className="mt-2 text-sm leading-relaxed text-muted">{children}</p>
+    </header>
   );
 }
 
@@ -127,10 +189,7 @@ export function OverviewPage() {
   const data = metrics.data;
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Overview</h1>
-        <p className="mt-1 text-sm text-muted">Demo environment. Counts are from this database, not the marketing totals.</p>
-      </header>
+      <PageIntro title="Overview">Counts below are from this database. They are not the marketing totals.</PageIntro>
       {data ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -139,33 +198,44 @@ export function OverviewPage() {
             <Stat label="Open escalations" value={data.escalations.open} />
             <Stat label="Engine p95" value={`${data.latency_ms.p95} ms`} />
           </div>
-          <div className="rounded-2xl border border-line p-4">
+          <div className="glass rounded-2xl p-4">
             <p className="text-sm text-muted">
               Allow {data.decisions.allow} · Escalate {data.decisions.escalate} · Block {data.decisions.block} · Redactions {data.redactions} · Kill trips {data.kill_switches.trips}
             </p>
-            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-white/5">
+            <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-white/5" role="img" aria-label={`Allow ${data.decisions.allow}, escalate ${data.decisions.escalate}, block ${data.decisions.block}`}>
               <Bar value={data.decisions.allow} total={data.decisions.total} color="#7ddeaf" />
               <Bar value={data.decisions.escalate} total={data.decisions.total} color="#e6b15a" />
               <Bar value={data.decisions.block} total={data.decisions.total} color="#f08378" />
             </div>
+            <ul className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
+              <li><span className="legend-dot" style={{ background: "#7ddeaf" }} />Allow {data.decisions.allow}</li>
+              <li><span className="legend-dot" style={{ background: "#e6b15a" }} />Escalate {data.decisions.escalate}</li>
+              <li><span className="legend-dot" style={{ background: "#f08378" }} />Block {data.decisions.block}</li>
+            </ul>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <h2 className="mb-2 text-sm font-medium">Drift</h2>
-              <ul className="divide-y divide-line rounded-2xl border border-line">
+              <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
                 {data.drift.map((item) => (
-                  <li key={item.agent_id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <li key={item.agent_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm">
                     <span>
                       {item.name} <span className="text-faint">{item.status}</span>
                     </span>
-                    <span className="font-mono text-xs text-muted">
-                      {item.recent_block_rate.toFixed(2)} / {item.baseline_block_rate.toFixed(2)} · {item.state}
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted">
+                        {item.recent_block_rate.toFixed(2)} / {item.baseline_block_rate.toFixed(2)}
+                      </span>
+                      <Status tone={item.state === "ok" ? "ok" : item.state === "watch" ? "warn" : "bad"}>{item.state}</Status>
                     </span>
                   </li>
                 ))}
               </ul>
             </div>
-            <DecisionTable rows={decisions.data || []} />
+            <div>
+              <h2 className="mb-2 text-sm font-medium">Latest decisions</h2>
+              <DecisionTable rows={decisions.data || []} />
+            </div>
           </div>
         </>
       ) : (
@@ -180,28 +250,40 @@ function Bar({ value, total, color }: { value: number; total: number; color: str
   return <div style={{ width: `${width}%`, background: color }} />;
 }
 
-function DecisionTable({ rows, onSelect }: { rows: Decision[]; onSelect?: (row: Decision) => void }) {
+function DecisionTable({ rows, onSelect, selectedId }: { rows: Decision[]; onSelect?: (row: Decision) => void; selectedId?: string | null }) {
   if (!rows.length) return <p className="text-sm text-muted">No decisions yet.</p>;
   return (
     <div className="overflow-x-auto rounded-2xl border border-line">
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wider text-faint">
+      <table className="console-table">
+        <thead>
           <tr>
-            <th className="px-3 py-2 font-medium">Agent</th>
-            <th className="px-3 py-2 font-medium">Tool</th>
-            <th className="px-3 py-2 font-medium">Outcome</th>
-            <th className="px-3 py-2 font-medium">ms</th>
+            <th>Agent</th>
+            <th>Tool</th>
+            <th>Outcome</th>
+            <th>ms</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-t border-line" onClick={() => onSelect?.(row)}>
-              <td className="px-3 py-2">{row.agent_name || row.agent_id}</td>
-              <td className="px-3 py-2 font-mono text-xs">{row.tool}</td>
-              <td className="px-3 py-2">
+            <tr
+              key={row.id}
+              className={`${onSelect ? "is-interactive" : ""} ${selectedId === row.id ? "is-selected" : ""}`}
+              tabIndex={onSelect ? 0 : undefined}
+              aria-selected={onSelect ? selectedId === row.id : undefined}
+              onClick={() => onSelect?.(row)}
+              onKeyDown={(event) => {
+                if (!onSelect) return;
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                onSelect(row);
+              }}
+            >
+              <td>{row.agent_name || row.agent_id}</td>
+              <td className="font-mono text-xs">{row.tool}</td>
+              <td>
                 <Outcome value={row.outcome} />
               </td>
-              <td className="px-3 py-2 font-mono text-xs">{row.engine_ms.toFixed(1)}</td>
+              <td className="font-mono text-xs">{row.engine_ms.toFixed(1)}</td>
             </tr>
           ))}
         </tbody>
@@ -225,18 +307,18 @@ export function AgentsPage() {
   if (error) return <Offline error={error} />;
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Agent inventory</h1>
-      <p className="mt-1 text-sm text-muted">Operational agents registered with the control plane.</p>
-      {message ? <p className="mt-3 text-sm text-rose">{message}</p> : null}
+      <PageIntro title="Agent inventory">Operational agents registered with the control plane.</PageIntro>
+      {message ? <p className="mt-3 text-sm text-rose" role="alert">{message}</p> : null}
+      {!data ? <p className="mt-6 text-sm text-muted" role="status">Loading the control plane…</p> : null}
       <div className="mt-6 grid gap-3 md:grid-cols-2">
         {(data || []).map((agent) => (
-          <article key={agent.id} className="rounded-2xl border border-line p-4">
+          <article key={agent.id} className="glass rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-semibold">{agent.name}</h2>
                 <p className="font-mono text-xs text-faint">{agent.id}</p>
               </div>
-              <Outcome value={agent.status === "halted" ? "BLOCK" : "ALLOW"} />
+              <Status tone={agent.status === "halted" ? "bad" : "ok"}>{agent.status === "halted" ? "Halted" : "Active"}</Status>
             </div>
             <p className="mt-2 text-sm text-muted">{agent.description}</p>
             <p className="mt-2 text-xs text-faint">
@@ -244,7 +326,8 @@ export function AgentsPage() {
             </p>
             <p className="mt-2 font-mono text-xs text-muted">{agent.tools_allowed.join(", ")}</p>
             <button
-              className="mt-3 rounded-full border border-line px-3 py-1 text-xs"
+              type="button"
+              className="mt-3 min-h-10 rounded-full border border-line px-3 py-2 text-xs"
               onClick={() => setStatus(agent.id, agent.status === "halted" ? "active" : "halted")}
             >
               {agent.status === "halted" ? "Resume" : "Halt"}
@@ -298,24 +381,23 @@ export function DecisionsPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
       <div>
-        <h1 className="text-2xl font-semibold">Live decisions</h1>
-        <p className="mt-1 text-sm text-muted">Every tool call is scored before it would run. Stored payloads are redacted.</p>
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3 rounded-2xl border border-line p-4 md:grid-cols-2">
+        <PageIntro title="Live decisions">Every tool call is scored before it would run. Stored payloads are redacted.</PageIntro>
+        <form onSubmit={onSubmit} className="glass mt-4 grid gap-3 rounded-2xl p-4 md:grid-cols-2">
           <label className="text-sm">
             Agent
-            <input className="mt-1 w-full rounded-lg border border-line bg-transparent px-2 py-1.5 font-mono text-xs" value={form.agent_id} onChange={(event) => setForm({ ...form, agent_id: event.target.value })} />
+            <input className="control font-mono text-xs" value={form.agent_id} onChange={(event) => setForm({ ...form, agent_id: event.target.value })} />
           </label>
           <label className="text-sm">
             Tool
-            <input className="mt-1 w-full rounded-lg border border-line bg-transparent px-2 py-1.5 font-mono text-xs" value={form.tool} onChange={(event) => setForm({ ...form, tool: event.target.value })} />
+            <input className="control font-mono text-xs" value={form.tool} onChange={(event) => setForm({ ...form, tool: event.target.value })} />
           </label>
           <label className="text-sm md:col-span-2">
             Arguments JSON
-            <textarea className="mt-1 w-full rounded-lg border border-line bg-transparent px-2 py-1.5 font-mono text-xs" rows={4} value={form.argumentsText} onChange={(event) => setForm({ ...form, argumentsText: event.target.value })} />
+            <textarea className="control font-mono text-xs" rows={4} value={form.argumentsText} onChange={(event) => setForm({ ...form, argumentsText: event.target.value })} />
           </label>
           <label className="text-sm md:col-span-2">
             Prompt
-            <input className="mt-1 w-full rounded-lg border border-line bg-transparent px-2 py-1.5 text-sm" value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} />
+            <input className="control" value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} />
           </label>
           <div className="flex flex-wrap gap-2 md:col-span-2">
             {presets.map((preset) => (
@@ -328,22 +410,22 @@ export function DecisionsPage() {
                 {preset.label}
               </button>
             ))}
-            <button className="rounded-full bg-cyan px-3 py-1 text-xs font-semibold text-[#04221c]" type="submit">
+            <button className="min-h-10 rounded-full bg-cyan px-3 py-2 text-xs font-semibold text-[#04221c]" type="submit">
               Submit tool call
             </button>
           </div>
-          {error ? <p className="text-sm text-rose md:col-span-2">{error}</p> : null}
+          {error ? <p className="text-sm text-rose md:col-span-2" role="alert">{error}</p> : null}
           {result ? (
-            <p className="text-sm md:col-span-2">
+            <p className="text-sm md:col-span-2" role="status">
               <Outcome value={result.outcome} /> <span className="ml-2 font-mono text-xs text-muted">engine {result.engine_ms} ms · latency {result.latency_ms} ms{result.killed ? " · agent halted" : ""}</span>
             </p>
           ) : null}
         </form>
         <div className="mt-4">
-          <DecisionTable rows={list.data || []} onSelect={setSelected} />
+          <DecisionTable rows={list.data || []} onSelect={setSelected} selectedId={selected?.id} />
         </div>
       </div>
-      <aside className="rounded-2xl border border-line p-4 text-sm">
+      <aside className="glass h-fit rounded-2xl p-4 text-sm">
         {selected ? (
           <>
             <Outcome value={selected.outcome} />
@@ -383,23 +465,20 @@ export function EscalationsPage() {
   if (error) return <Offline error={error} />;
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Escalation queue</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted">
-        Finance Manager, CFO, and Compliance Officer. Resolving records the human decision. Decidion does not execute the underlying tool.
-      </p>
-      <label className="mt-4 block text-sm">
+      <PageIntro title="Escalation queue">Finance Manager, CFO, and Compliance Officer. Resolving records the human decision. Decidion does not execute the underlying tool.</PageIntro>
+      <label className="mt-4 block max-w-lg text-sm">
         Note
-        <input className="mt-1 w-full max-w-lg rounded-lg border border-line bg-transparent px-2 py-1.5" value={note} onChange={(event) => setNote(event.target.value)} />
+        <input className="control" value={note} onChange={(event) => setNote(event.target.value)} />
       </label>
-      {message ? <p className="mt-2 text-sm text-rose">{message}</p> : null}
+      {message ? <p className="mt-2 text-sm text-rose" role="alert">{message}</p> : null}
       <div className="mt-4 space-y-3">
         {(data || []).map((item) => (
-          <article key={item.id} className="rounded-2xl border border-line p-4">
+          <article key={item.id} className="glass rounded-2xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-medium">
                 {item.agent_name} · {item.role_label}
               </h2>
-              <span className="font-mono text-xs text-amber">{item.sla_state}</span>
+              <Status tone={item.sla_state === "breached" ? "bad" : item.sla_state === "due_soon" ? "warn" : item.sla_state === "on_track" ? "ok" : "neutral"}>{item.sla_state}</Status>
             </div>
             <p className="mt-1 font-mono text-xs text-faint">
               {item.status} · due {item.sla_due_at} · {item.decision_id}
@@ -407,10 +486,10 @@ export function EscalationsPage() {
             {item.note ? <p className="mt-2 text-sm text-muted">{item.note}</p> : null}
             {item.status === "open" ? (
               <div className="mt-3 flex gap-2">
-                <button className="rounded-full bg-cyan px-3 py-1 text-xs font-semibold text-[#04221c]" onClick={() => resolve(item.id, "approve", item.role)}>
+                <button type="button" className="min-h-10 rounded-full bg-cyan px-3 py-2 text-xs font-semibold text-[#04221c]" onClick={() => resolve(item.id, "approve", item.role)}>
                   Approve
                 </button>
-                <button className="rounded-full border border-line px-3 py-1 text-xs" onClick={() => resolve(item.id, "reject", item.role)}>
+                <button type="button" className="min-h-10 rounded-full border border-line px-3 py-2 text-xs" onClick={() => resolve(item.id, "reject", item.role)}>
                   Reject
                 </button>
               </div>
@@ -457,15 +536,14 @@ export function KillSwitchPage() {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Kill switches</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">Nine conditions. When armed, a matching block halts the agent. The next call returns on the fast path.</p>
+          <PageIntro title="Kill switches">Nine conditions. When armed, a matching block halts the agent. The next call returns on the fast path.</PageIntro>
         </div>
-        <button className="rounded-full bg-rose px-3 py-1.5 text-xs font-semibold text-[#2a0d0b]" onClick={incident}>
+        <button type="button" className="min-h-10 rounded-full bg-rose px-3 py-2 text-xs font-semibold text-[#2a0d0b]" onClick={incident}>
           Replay bias incident
         </button>
       </div>
-      {message ? <p className="mt-3 text-sm text-muted">{message}</p> : null}
-      <ul className="mt-5 divide-y divide-line rounded-2xl border border-line">
+      {message ? <p className="mt-3 text-sm text-muted" role="status">{message}</p> : null}
+      <ul className="mt-5 divide-y divide-line overflow-hidden rounded-2xl border border-line">
         {(data || []).map((item) => (
           <li key={item.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
             <div>
@@ -477,7 +555,7 @@ export function KillSwitchPage() {
                 {item.last_tripped_at ? ` · ${item.last_tripped_at}` : ""}
               </p>
             </div>
-            <button className={`rounded-full px-3 py-1 text-xs ${item.enabled ? "bg-cyan/20 text-cyan-2" : "border border-line text-muted"}`} onClick={() => toggle(item)}>
+            <button type="button" aria-pressed={item.enabled} className={`min-h-10 rounded-full px-3 py-2 text-xs ${item.enabled ? "bg-cyan/20 text-cyan-2" : "border border-line text-muted"}`} onClick={() => toggle(item)}>
               {item.enabled ? "Armed" : "Disarmed"}
             </button>
           </li>
@@ -509,35 +587,34 @@ export function AuditPage() {
   if (events.error) return <Offline error={events.error} />;
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Audit trail</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted">Hash-chained inside the database. This is an application-level chain, not a WORM ledger.</p>
+      <PageIntro title="Audit trail">Hash-chained inside the database. This is an application-level chain, not a WORM ledger.</PageIntro>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="rounded-full bg-cyan px-3 py-1 text-xs font-semibold text-[#04221c]" onClick={check}>
+        <button type="button" className="min-h-10 rounded-full bg-cyan px-3 py-2 text-xs font-semibold text-[#04221c]" onClick={check}>
           Verify chain
         </button>
         {["SOX", "AML", "GDPR", "EU_AI_ACT"].map((framework) => (
-          <button key={framework} className="rounded-full border border-line px-3 py-1 text-xs" onClick={() => download(framework)}>
+          <button type="button" key={framework} className="min-h-10 rounded-full border border-line px-3 py-2 text-xs" onClick={() => download(framework)}>
             Export {framework}
           </button>
         ))}
       </div>
-      {verify ? <p className="mt-3 text-sm text-cyan-2">{verify}</p> : null}
+      {verify ? <p className="mt-3 text-sm text-cyan-2" role="status">{verify}</p> : null}
       {report ? <p className="mt-2 text-xs text-faint">{report.disclaimer}</p> : null}
       <div className="mt-4 overflow-x-auto rounded-2xl border border-line">
-        <table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-faint">
+        <table className="console-table">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Seq</th>
-              <th className="px-3 py-2">Event</th>
-              <th className="px-3 py-2">Hash</th>
+              <th>Seq</th>
+              <th>Event</th>
+              <th>Hash</th>
             </tr>
           </thead>
           <tbody>
             {(events.data || []).map((event) => (
-              <tr key={event.seq} className="border-t border-line">
-                <td className="px-3 py-2 font-mono text-xs">{event.seq}</td>
-                <td className="px-3 py-2">{event.event_type}</td>
-                <td className="px-3 py-2 font-mono text-xs text-faint">{event.hash.slice(0, 16)}…</td>
+              <tr key={event.seq}>
+                <td className="font-mono text-xs">{event.seq}</td>
+                <td>{event.event_type}</td>
+                <td className="font-mono text-xs text-faint">{event.hash.slice(0, 16)}…</td>
               </tr>
             ))}
           </tbody>
@@ -582,34 +659,36 @@ export function PoliciesPage() {
   if (error) return <Offline error={error} />;
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Policies</h1>
-      <p className="mt-1 text-sm text-muted">P-GEN, P-FIN, P-AML, and custom policy-as-code. Disabled policies are skipped by their evaluator.</p>
-      <form onSubmit={create} className="mt-4 grid gap-2 rounded-2xl border border-line p-4 md:grid-cols-4">
-        <input name="id" required placeholder="P-CUSTOM" className="rounded-lg border border-line bg-transparent px-2 py-1.5 font-mono text-xs" />
-        <input name="name" required placeholder="Name" className="rounded-lg border border-line bg-transparent px-2 py-1.5 text-sm" />
-        <input name="tool" required placeholder="tool name" className="rounded-lg border border-line bg-transparent px-2 py-1.5 font-mono text-xs" />
-        <select name="outcome" className="rounded-lg border border-line bg-[#10161d] px-2 py-1.5 text-sm">
-          <option>ESCALATE</option>
-          <option>BLOCK</option>
-          <option>ALLOW</option>
-        </select>
-        <input name="reason" required placeholder="Reason shown to reviewers" className="rounded-lg border border-line bg-transparent px-2 py-1.5 text-sm md:col-span-3" />
-        <button className="rounded-full bg-cyan px-3 py-1.5 text-xs font-semibold text-[#04221c]" type="submit">
+      <PageIntro title="Policies">P-GEN, P-FIN, P-AML, and custom policy-as-code. Disabled policies are skipped by their evaluator.</PageIntro>
+      <form onSubmit={create} className="glass mt-4 grid gap-3 rounded-2xl p-4 md:grid-cols-4">
+        <label className="text-sm">Id<input name="id" required placeholder="P-CUSTOM" className="control font-mono text-xs" /></label>
+        <label className="text-sm">Name<input name="name" required className="control" /></label>
+        <label className="text-sm">Tool<input name="tool" required placeholder="tool name" className="control font-mono text-xs" /></label>
+        <label className="text-sm">
+          Outcome
+          <select name="outcome" className="control">
+            <option>ESCALATE</option>
+            <option>BLOCK</option>
+            <option>ALLOW</option>
+          </select>
+        </label>
+        <label className="text-sm md:col-span-3">Reason<input name="reason" required placeholder="Reason shown to reviewers" className="control" /></label>
+        <button className="min-h-10 self-end rounded-full bg-cyan px-3 py-2 text-xs font-semibold text-[#04221c]" type="submit">
           Add policy
         </button>
       </form>
-      {message ? <p className="mt-2 text-sm text-muted">{message}</p> : null}
+      {message ? <p className="mt-2 text-sm text-muted" role="status">{message}</p> : null}
       <div className="mt-4 space-y-2">
         {(data || []).map((policy) => (
-          <article key={policy.id} className="rounded-2xl border border-line p-4">
+          <article key={policy.id} className="glass rounded-2xl p-4">
             <div className="flex items-start justify-between gap-3">
-              <button className="text-left" onClick={() => setOpen(open === policy.id ? null : policy.id)}>
+              <button type="button" className="text-left" aria-expanded={open === policy.id} onClick={() => setOpen(open === policy.id ? null : policy.id)}>
                 <h2 className="font-semibold">
                   {policy.id} · {policy.name}
                 </h2>
                 <p className="text-sm text-muted">{policy.description}</p>
               </button>
-              <button className="rounded-full border border-line px-3 py-1 text-xs" onClick={() => toggle(policy)}>
+              <button type="button" aria-pressed={policy.enabled} className="min-h-10 rounded-full border border-line px-3 py-2 text-xs" onClick={() => toggle(policy)}>
                 {policy.enabled ? "Enabled" : "Disabled"}
               </button>
             </div>
@@ -641,21 +720,23 @@ export function EvaluationsPage() {
   const shown = current || history.data?.[0];
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Evaluations</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted">Fixed red-team pack in a sandbox. It does not halt the agent or open escalations.</p>
+      <PageIntro title="Evaluations">Fixed red-team pack in a sandbox. It does not halt the agent or open escalations.</PageIntro>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <select className="rounded-lg border border-line bg-[#10161d] px-2 py-1.5 text-sm" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
+        <label className="text-sm">
+          Agent
+          <select className="control" value={agentId} onChange={(event) => setAgentId(event.target.value)}>
           {(agents.data || []).map((agent) => (
             <option key={agent.id} value={agent.id}>
               {agent.name}
             </option>
           ))}
         </select>
-        <button className="rounded-full bg-cyan px-3 py-1.5 text-xs font-semibold text-[#04221c]" onClick={run}>
+        </label>
+        <button type="button" className="min-h-10 self-end rounded-full bg-cyan px-3 py-2 text-xs font-semibold text-[#04221c]" onClick={run}>
           Run sandbox
         </button>
       </div>
-      {error ? <p className="mt-2 text-sm text-rose">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm text-rose" role="alert">{error}</p> : null}
       {shown ? (
         <div className="mt-4">
           <p className="text-sm">
@@ -663,10 +744,11 @@ export function EvaluationsPage() {
           </p>
           <ul className="mt-3 divide-y divide-line rounded-2xl border border-line">
             {shown.scenarios.map((scenario) => (
-              <li key={scenario.name} className="flex items-center justify-between px-3 py-2 text-sm">
+              <li key={scenario.name} className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm">
                 <span>{scenario.name}</span>
-                <span className="font-mono text-xs">
-                  expect {scenario.expect} · got {scenario.outcome} · {scenario.passed ? "pass" : "fail"}
+                <span className="flex items-center gap-2 font-mono text-xs">
+                  expect {scenario.expect} · got {scenario.outcome}
+                  <Status tone={scenario.passed ? "ok" : "bad"}>{scenario.passed ? "pass" : "fail"}</Status>
                 </span>
               </li>
             ))}
@@ -683,15 +765,14 @@ export function FinOpsPage() {
   if (!data) return <p className="text-sm text-muted">Loading…</p>;
   return (
     <div>
-      <h1 className="text-2xl font-semibold">FinOps</h1>
-      <p className="mt-1 max-w-2xl text-sm text-muted">{data.note}</p>
+      <PageIntro title="FinOps">{data.note}</PageIntro>
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Stat label="Tokens in" value={data.tokens_in} />
-        <Stat label="Tokens forwarded" value={data.tokens_forwarded} />
-        <Stat label="Savings ratio" value={`${Math.round(data.savings_ratio * 1000) / 10}%`} />
-        <Stat label="Illustrative ungoverned" value={`$${data.illustrative_ungoverned_usd}`} />
-        <Stat label="Illustrative forwarded" value={`$${data.illustrative_forwarded_usd}`} />
-        <Stat label="Price / million" value={`$${data.illustrative_price_per_million_usd}`} />
+        <Stat label="Tokens in" value={data.tokens_in} note="This database" />
+        <Stat label="Tokens forwarded" value={data.tokens_forwarded} note="This database" />
+        <Stat label="Savings ratio" value={`${Math.round(data.savings_ratio * 1000) / 10}%`} note="Estimate, not an invoice" />
+        <Stat label="Illustrative ungoverned" value={`$${data.illustrative_ungoverned_usd}`} note="Illustrative price" />
+        <Stat label="Illustrative forwarded" value={`$${data.illustrative_forwarded_usd}`} note="Illustrative price" />
+        <Stat label="Price / million" value={`$${data.illustrative_price_per_million_usd}`} note="Illustrative price" />
       </div>
     </div>
   );

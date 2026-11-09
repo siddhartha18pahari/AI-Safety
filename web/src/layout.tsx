@@ -4,6 +4,11 @@ import { nav } from "./data";
 import { useMarketingMotion } from "./motion";
 import { Button, Wordmark } from "./ui";
 
+const groups: { title: string; hrefs: string[] }[] = [
+  { title: "Product", hrefs: ["/solutions", "/industries", "/compliance", "/resources"] },
+  { title: "Company", hrefs: ["/customers", "/blog", "/press", "/about", "/contact"] },
+];
+
 export function MarketingLayout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -19,52 +24,74 @@ export function MarketingLayout() {
     window.scrollTo(0, 0);
   }, [location.pathname, location.hash]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   return (
     <div className="relative min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-[#07090c]/70 backdrop-blur-xl">
+      <a className="skip" href="#content">
+        Skip to content
+      </a>
+      <header className="sticky top-0 z-40 border-b border-line bg-[#07090c]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3">
           <Wordmark />
-          <nav className="ml-auto hidden items-center gap-4 xl:flex">
+          <nav className="ml-6 hidden items-center gap-4 xl:flex" aria-label="Primary">
             {nav.map((item) => (
               <NavLink
                 key={item.href}
                 to={item.href}
-                className={({ isActive }) =>
-                  `text-sm ${isActive ? "text-cyan-2" : "text-muted hover:text-ink"}`
-                }
+                className="nav-link pb-0.5 hover:text-ink"
               >
                 {item.label}
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto xl:ml-2">
+          <div className="ml-auto flex items-center gap-3">
+            <Link to="/console" className="hidden text-sm text-muted hover:text-ink sm:inline">
+              Console
+            </Link>
             <Button href="/contact#demo">Book a Demo</Button>
+            <button
+              className="rounded-full border border-white/15 px-3 py-2 text-xs uppercase tracking-wider text-muted xl:hidden"
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+              aria-controls="site-menu"
+            >
+              Menu
+            </button>
           </div>
-          <button
-            className="rounded-full border border-white/15 px-3 py-2 text-xs uppercase tracking-wider text-muted xl:hidden"
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            aria-label="Menu"
-          >
-            Menu
-          </button>
         </div>
         {open ? (
-          <nav className="border-t border-line px-5 py-4 xl:hidden">
-            <div className="grid gap-3">
-              {nav.map((item) => (
-                <Link key={item.href} to={item.href} className="text-sm text-ink">
-                  {item.label}
-                </Link>
-              ))}
-              <Link to="/console" className="text-sm text-cyan-2">
-                Platform console
-              </Link>
-            </div>
+          <nav id="site-menu" className="border-t border-line px-5 py-4 xl:hidden" aria-label="Mobile">
+            {groups.map((group) => (
+              <div key={group.title} className="mb-4">
+                <p className="kicker">{group.title}</p>
+                <div className="mt-2 grid gap-1">
+                  {nav
+                    .filter((item) => group.hrefs.includes(item.href))
+                    .map((item) => (
+                      <Link key={item.href} to={item.href} className="rounded-lg px-1 py-2 text-sm text-ink">
+                        {item.label}
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            ))}
+            <Link to="/console" className="block rounded-lg px-1 py-2 text-sm text-cyan-2">
+              Platform console
+            </Link>
           </nav>
         ) : null}
       </header>
-      <Outlet />
+      <div id="content">
+        <Outlet />
+      </div>
       <footer className="border-t border-line">
         <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 md:grid-cols-4">
           <div>

@@ -72,14 +72,14 @@ function Hero() {
         <span className="blob blob-c" />
         <span className="grid-fade" />
       </div>
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-[1.15fr_0.85fr] lg:py-24">
-        <div>
+      <div className="mx-auto grid w-full min-w-0 max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:py-24">
+        <div className="min-w-0">
           <p className="kicker">The unified plane for multi-agent systems</p>
           <div className="mt-5 min-h-[7.5rem] sm:min-h-[8.5rem]" aria-live="polite">
-            <p key={lineA} className="rise headline-glow text-2xl font-semibold tracking-tight text-cyan-2 sm:text-4xl">
+            <p key={lineA} className="rise headline-glow text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-cyan-2 sm:text-4xl">
               {lineA}
             </p>
-            <p key={lineB} className="rise headline-glow mt-1 text-2xl font-semibold tracking-tight sm:text-4xl">
+            <p key={lineB} className="rise headline-glow mt-1 text-[1.65rem] font-semibold leading-[1.15] tracking-tight sm:text-4xl">
               {lineB}
             </p>
           </div>
@@ -204,20 +204,28 @@ function LiveTape() {
   const reduced = useReducedMotion();
   const [source, setSource] = useState<Decision[]>(fallbackDecisions);
   const [rows, setRows] = useState<Decision[]>(() => tapeRows(fallbackDecisions, "init"));
+  const [connected, setConnected] = useState(false);
   const cursor = useRef(0);
 
   useEffect(() => {
+    let active = true;
     api<Decision[]>("/v1/decisions?limit=8")
       .then((items) => {
-        if (!items.length) return;
+        if (!active || !items.length) return;
+        setConnected(true);
         setSource(items);
         setRows(tapeRows(items, "api"));
         cursor.current = 0;
       })
       .catch(() => {
+        if (!active) return;
+        setConnected(false);
         setSource(fallbackDecisions);
         setRows(tapeRows(fallbackDecisions, "demo"));
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -235,11 +243,11 @@ function LiveTape() {
   }, [reduced, source]);
 
   return (
-    <Panel className="overflow-hidden">
+    <Panel className="min-w-0 overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
         <p className="kicker flex items-center gap-2">
-          <span className="live-dot" aria-hidden="true" />
-          Control plane
+          {connected ? <span className="live-dot" aria-hidden="true" /> : null}
+          {connected ? "This API" : "Sample tape"}
         </p>
         <span className="font-mono text-[11px] text-faint">ALLOW · ESCALATE · BLOCK</span>
       </div>
@@ -259,7 +267,11 @@ function LiveTape() {
           </li>
         ))}
       </ul>
-      <div className="px-4 py-3 text-xs text-faint">Live when the API is running. Otherwise this is the demo tape.</div>
+      <div className="source-note border-t border-line px-4 py-3">
+        {connected
+          ? "Rows from the API this browser is calling, replayed in this panel. Not a production measurement."
+          : "Sample events. The API did not respond, so this is not connected data."}
+      </div>
     </Panel>
   );
 }
@@ -284,7 +296,7 @@ function Integrations() {
     <section id="integrations" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Integrations</p>
-        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">Seamless integration with leading AI frameworks</h2>
+        <h2 className="mt-3 max-w-2xl section-title">Seamless integration with leading AI frameworks</h2>
         <p className="mt-4 max-w-2xl text-muted">
           LangChain, CrewAI, AutoGen, LangGraph, and custom runtimes call the same decide API. The SDK raises before the tool runs. REST and the webhook alias return the same outcome.
         </p>
@@ -295,6 +307,7 @@ function Integrations() {
                 key={item.id}
                 type="button"
                 onClick={() => setFramework(item)}
+                aria-pressed={framework.id === item.id}
                 className={`tilt rounded-xl border px-3 py-3 text-left text-sm ${framework.id === item.id ? "border-cyan/50 bg-cyan/10 text-ink" : "border-line text-muted"}`}
               >
                 <span className="block font-medium text-ink">{item.name}</span>
@@ -309,6 +322,7 @@ function Integrations() {
                   key={item}
                   type="button"
                   onClick={() => setTab(item)}
+                  aria-pressed={tab === item}
                   className={`rounded-full px-3 py-1 text-xs ${tab === item ? "bg-white text-[#071018]" : "text-muted"}`}
                 >
                   {item}
@@ -328,6 +342,7 @@ function Integrations() {
             </div>
           ))}
         </dl>
+        <p className="source-note mt-4 max-w-3xl">Product narrative on this page. The console shows counts from the database you connect, not these figures.</p>
       </div>
     </section>
   );
@@ -338,7 +353,7 @@ function Testimonials() {
     <section className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Trusted by industry leaders</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">One platform to deploy AI faster, safely.</h2>
+        <h2 className="mt-3 section-title">One platform to deploy AI faster, safely.</h2>
         <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {quotes.map((item) => (
             <figure key={item.name} className="glass tilt rounded-2xl p-6">
@@ -360,7 +375,7 @@ function Problems() {
     <section className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Making AI enterprise-ready</p>
-        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">AI tools your teams love leak data and create risk.</h2>
+        <h2 className="mt-3 max-w-2xl section-title">AI tools your teams love leak data and create risk.</h2>
         <p className="mt-4 text-muted">Most AI deployments are vulnerable. They don't have to be.</p>
         <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {problems.map((item, index) => (
@@ -381,7 +396,7 @@ function Solution() {
     <section id="solution" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Solution</p>
-        <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Decidion is the command and control plane for AI agents</h2>
+        <h2 className="mt-3 max-w-3xl section-title">Decidion is the command and control plane for AI agents</h2>
         <p className="mt-4 max-w-2xl text-muted">Discover how Decidion connects any agent, any framework, anywhere securely.</p>
         <div className="stagger mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {capabilities.map((item) => (
@@ -401,7 +416,7 @@ function FeatureGrid() {
     <section className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">The problem we solve</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">The unified plane for multi-agent systems</h2>
+        <h2 className="mt-3 section-title">The unified plane for multi-agent systems</h2>
         <p className="mt-4 text-muted">One platform unifying Governance, Risk, Compliance, Data Governance, Security & Evaluations</p>
         <div className="stagger mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map((item) => (
@@ -426,7 +441,7 @@ function LifecycleGrid() {
     <section id="lifecycle" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Unified governance plane</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Complete lifecycle coverage: development to production</h2>
+        <h2 className="mt-3 section-title">Complete lifecycle coverage: development to production</h2>
         <p className="mt-4 max-w-3xl text-muted">One unified plane for monitoring, observability, and management of governance and security—covering 30+ capabilities</p>
         <div className="stagger mt-8 grid gap-4 md:grid-cols-2">
           {coverage.map((group) => (
@@ -503,7 +518,7 @@ function Architecture() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="kicker">Architecture</p>
-            <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Four-layer architecture</h2>
+            <h2 className="mt-3 max-w-3xl section-title">Four-layer architecture</h2>
             <p className="mt-4 max-w-2xl text-muted">From autonomous enforcement to human oversight—governance that scales with your AI operations</p>
           </div>
           <button type="button" onClick={trace} className="rounded-full border border-cyan/40 px-4 py-2 text-sm text-cyan-2 hover:bg-cyan/10">
@@ -578,7 +593,8 @@ export function Industries() {
     <section id="industries" className="border-b border-line">
       <div className="mx-auto max-w-6xl px-5 py-20">
         <p className="kicker">Industries</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Built where agent failure is not an option</h2>
+        <h2 className="mt-3 section-title">Built where agent failure is not an option</h2>
+        <p className="source-note mt-3 max-w-3xl">The metrics in these blocks are the product story. They are not measurements from this console.</p>
         <div className="mt-10 space-y-12">
           {industryBlocks.map((block) => (
             <article key={block.id} id={block.id}>
@@ -627,7 +643,7 @@ function GetStarted() {
       <div className="mx-auto max-w-6xl px-5 py-20">
         <div className="cta-band">
         <p className="kicker">Get started</p>
-        <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">Ready to govern your AI fleet with confidence?</h2>
+        <h2 className="mt-3 max-w-2xl section-title">Ready to govern your AI fleet with confidence?</h2>
         <p className="mt-4 max-w-2xl text-muted">
           See how Decidion enables enterprises to scale AI operations while maintaining complete governance, compliance, and control.
         </p>
