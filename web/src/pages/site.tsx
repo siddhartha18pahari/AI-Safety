@@ -331,8 +331,10 @@ export function ResourcesPage() {
           {kinds.map((kind) => (
             <button
               key={kind}
+              type="button"
+              aria-pressed={filter === kind}
               onClick={() => setFilter(kind)}
-              className={`rounded-full px-3 py-1 text-sm ${filter === kind ? "bg-white text-[#071018]" : "border border-line text-muted"}`}
+              className={`min-h-10 rounded-full px-3 py-1 text-sm ${filter === kind ? "bg-white text-[#071018]" : "border border-line text-muted"}`}
             >
               {kind}
             </button>
@@ -389,11 +391,11 @@ function DownloadGate() {
         <form className="mt-4 space-y-3" onSubmit={onSubmit}>
           <label className="block text-sm">
             Name
-            <input name="name" required className="mt-1 w-full rounded-xl border border-line bg-transparent px-3 py-2" />
+            <input name="name" required className="control" />
           </label>
           <label className="block text-sm">
             Industry
-            <select name="industry" required className="mt-1 w-full rounded-xl border border-line bg-[#10161d] px-3 py-2" defaultValue="">
+            <select name="industry" required className="control" defaultValue="">
               <option value="" disabled>
                 Select
               </option>
@@ -406,10 +408,10 @@ function DownloadGate() {
           </label>
           <label className="block text-sm">
             Work email
-            <input name="email" type="email" required className="mt-1 w-full rounded-xl border border-line bg-transparent px-3 py-2" />
+            <input name="email" type="email" required className="control" />
           </label>
-          {error ? <p className="text-sm text-rose">{error}</p> : null}
-          <button className="rounded-full bg-cyan px-4 py-2 text-sm font-semibold text-[#04221c]" type="submit">
+          {error ? <p className="text-sm text-rose" role="alert">{error}</p> : null}
+          <button className="min-h-10 rounded-full bg-cyan px-4 py-2 text-sm font-semibold text-[#04221c]" type="submit">
             Download the report
           </button>
         </form>
@@ -457,8 +459,10 @@ export function BlogPage() {
           {kinds.map((kind) => (
             <button
               key={kind}
+              type="button"
+              aria-pressed={filter === kind}
               onClick={() => setFilter(kind)}
-              className={`rounded-full px-3 py-1 text-sm ${filter === kind ? "bg-white text-[#071018]" : "border border-line text-muted"}`}
+              className={`min-h-10 rounded-full px-3 py-1 text-sm ${filter === kind ? "bg-white text-[#071018]" : "border border-line text-muted"}`}
             >
               {kind}
             </button>
@@ -632,7 +636,7 @@ export function ContactPage() {
               <Field label="Company" name="company" />
               <label className="block text-sm">
                 Industry
-                <select key={topic} name="industry" defaultValue={topic} className="mt-1 w-full rounded-xl border border-line bg-[#10161d] px-3 py-2">
+                <select key={topic} name="industry" defaultValue={topic} className="control">
                   <option value="">Select</option>
                   <option value="financial">Financial Services</option>
                   <option value="healthcare">Healthcare</option>
@@ -642,10 +646,10 @@ export function ContactPage() {
               </label>
               <label className="block text-sm">
                 How can we help?
-                <textarea name="message" rows={4} className="mt-1 w-full rounded-xl border border-line bg-transparent px-3 py-2" />
+                <textarea name="message" rows={4} className="control" />
               </label>
-              {error ? <p className="text-sm text-rose">{error}</p> : null}
-              <button className="rounded-full bg-cyan px-4 py-2 text-sm font-semibold text-[#04221c]" type="submit">
+              {error ? <p className="text-sm text-rose" role="alert">{error}</p> : null}
+              <button className="min-h-10 rounded-full bg-cyan px-4 py-2 text-sm font-semibold text-[#04221c]" type="submit">
                 Send
               </button>
             </form>
@@ -660,7 +664,7 @@ function Field({ label, name, type = "text" }: { label: string; name: string; ty
   return (
     <label className="block text-sm">
       {label}
-      <input name={name} type={type} className="mt-1 w-full rounded-xl border border-line bg-transparent px-3 py-2" />
+      <input name={name} type={type} className="control" />
     </label>
   );
 }

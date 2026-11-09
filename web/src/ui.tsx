@@ -64,8 +64,20 @@ export function Button({
 
 export function Outcome({ value }: { value: string }) {
   const tone =
-    value === "ALLOW" ? "text-allow border-allow/30 bg-allow/10" : value === "ESCALATE" ? "text-amber border-amber/30 bg-amber/10" : value === "BLOCK" ? "text-rose border-rose/30 bg-rose/10" : "text-muted border-white/10";
+    value === "ALLOW" ? "text-allow border-allow/30 bg-allow/10" : value === "ESCALATE" ? "text-amber border-amber/30 bg-amber/10" : value === "BLOCK" ? "text-rose border-rose/30 bg-rose/10" : "text-muted border-white/15 bg-white/5";
   return <span className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[11px] tracking-wide ${tone}`}>{value}</span>;
+}
+
+const statusTone = {
+  ok: "text-allow border-allow/30 bg-allow/10",
+  warn: "text-amber border-amber/30 bg-amber/10",
+  bad: "text-rose border-rose/30 bg-rose/10",
+  info: "text-cyan-2 border-cyan/30 bg-cyan/10",
+  neutral: "text-muted border-white/15 bg-white/5",
+};
+
+export function Status({ children, tone = "neutral" }: { children: ReactNode; tone?: keyof typeof statusTone }) {
+  return <span className={`inline-flex rounded-full border px-2 py-0.5 font-mono text-[11px] tracking-wide ${statusTone[tone]}`}>{children}</span>;
 }
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -87,7 +99,7 @@ export function PageHero({
     <header className="page-hero border-b border-line">
       <div className="mx-auto max-w-6xl px-5 pb-14 pt-16">
         <p className="kicker">{kicker}</p>
-        <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">{title}</h1>
+        <h1 className="display mt-4 max-w-3xl text-4xl text-balance md:text-5xl">{title}</h1>
         <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{lede}</p>
         {children ? <div className="mt-8 flex flex-wrap gap-3">{children}</div> : null}
       </div>
