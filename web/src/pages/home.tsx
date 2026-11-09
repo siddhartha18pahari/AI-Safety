@@ -208,19 +208,24 @@ function LiveTape() {
   const cursor = useRef(0);
 
   useEffect(() => {
+    let active = true;
     api<Decision[]>("/v1/decisions?limit=8")
       .then((items) => {
-        if (!items.length) return;
+        if (!active || !items.length) return;
         setConnected(true);
         setSource(items);
         setRows(tapeRows(items, "api"));
         cursor.current = 0;
       })
       .catch(() => {
+        if (!active) return;
         setConnected(false);
         setSource(fallbackDecisions);
         setRows(tapeRows(fallbackDecisions, "demo"));
       });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {

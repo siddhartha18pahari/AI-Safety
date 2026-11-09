@@ -14,6 +14,7 @@ import {
   type Policy,
   type Report,
 } from "../api";
+import { probeApiHealth } from "../health";
 import { Mark, Outcome, Status, useTitle } from "../ui";
 
 const links = [
@@ -39,19 +40,17 @@ export function ConsoleLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    let active = true;
     setHealth("checking");
-    fetch(`${API_BASE}/health`)
-      .then((response) => {
-        if (!cancelled) setHealth(response.ok ? "up" : "down");
-      })
-      .catch(() => {
-        if (!cancelled) setHealth("down");
-      });
+    probeApiHealth(`${API_BASE}/health`, fetch, controller.signal).then((up) => {
+      if (active) setHealth(up ? "up" : "down");
+    });
     return () => {
-      cancelled = true;
+      active = false;
+      controller.abort();
     };
-  }, [location.pathname]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
